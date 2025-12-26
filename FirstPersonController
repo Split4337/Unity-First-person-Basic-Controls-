@@ -1,0 +1,146 @@
+
+using UnityEngine;
+
+
+public class FirstPersonController : MonoBehaviour
+{
+// Label for speed settings in the Inspector
+[Header("Movement Speeds")]
+// The base speed of the player when walking normally
+[SerializeField] private float walkSpeed = 3.0f;
+// The number that multiplies walkSpeed when sprinting (e.g., 3.0 * 2.0 = 6.0)
+[SerializeField] private float sprintMultiplier = 2.0f;
+
+```
+// Label for jumping and gravity settings
+[Header("Jump Parameters")]
+// How high the player will jump (initial upward velocity)
+[SerializeField] private float jumpForce = 5.0f;
+// A multiplier to make gravity feel heavier or lighter
+[SerializeField] private float gravityMultiplier = 1.0f;
+
+// Label for mouse/looking settings
+[Header("Look Parameters")]
+// How fast the camera responds to mouse movement
+[SerializeField] private float mouseSensitivity = 0.1f;
+// Limits how far you can look up or down (prevents flipping the camera)
+[SerializeField] private float upDownLookRange = 80.0f;
+
+// Label for the objects this script needs to function
+[Header("References")]
+// Reference to the CharacterController component on the player object
+[SerializeField] private CharacterController characterController;
+// Reference to the Camera (usually a child of the player)
+[SerializeField] private Camera mainCamera;
+// Reference to your Input Handler script to get button presses
+[SerializeField] private PlayerInputHandler playerInputHandler;
+
+// Stores the current 3D velocity (X, Y, Z) of the player
+private Vector3 currentMovement;
+// Stores the current up/down angle of the camera
+private float verticalRotation;
+
+// *** SPRINT LOGIC ***: If SprintTriggered is true, use walkSpeed * multiplier; otherwise use just walkSpeed
+private float CurrentSpeed => walkSpeed * (playerInputHandler.SprintTriggered ? sprintMultiplier : 1);
+
+// Called when the game starts
+void Start()
+{
+    // Locks the mouse to the middle of the game screen
+    Cursor.lockState = CursorLockMode.Locked;
+    // Hides the mouse cursor so you can't see it while playing
+    Cursor.visible = false;
+}
+
+// Called every single frame
+void Update()
+{
+    // Executes the movement logic
+    handleMovement();
+    // Executes the mouse looking logic
+    HandleRotation();
+}
+
+// Turns your 2D input (WASD) into 3D world direction relative to where you face
+private Vector3 CalculateWorldDirection()
+{
+    // Creates a new vector from Input Handler's movement data
+    Vector3 inputDirection = new Vector3(playerInputHandler.MovementInput.x, 0f, playerInputHandler.MovementInput.y);
+    // Converts that local direction into world space (forward is where the player looks)
+    Vector3 worldDirection = transform.TransformDirection(inputDirection);
+    // Returns the direction at a length of 1 so diagonal movement isn't faster
+    return worldDirection.normalized;
+}
+
+// Handles gravity and jumping
+private void HandleJumping()
+{
+    // Only allow jumping if we are currently on the floor
+    if (characterController.isGrounded)
+    {
+        // Applies a tiny bit of down force to stay grounded on slopes
+        currentMovement.y = -0.5f;
+
+        // If the jump button was pressed in the input script
+        if (playerInputHandler.JumpTriggered)
+        {
+            // Set the upward velocity to the jump force
+            currentMovement.y = jumpForce;
+        }
+    }
+    else
+    {
+        // If in the air, pull the player down using Unity's gravity and our multiplier
+        currentMovement.y += Physics.gravity.y * gravityMultiplier * Time.deltaTime;
+    }
+}
+
+// The main function that physically moves the CharacterController
+private void handleMovement()
+{
+    // Gets the direction we want to move
+    Vector3 worldDirection = CalculateWorldDirection();
+    // Applies the CurrentSpeed (which includes the sprint calculation) to X
+    currentMovement.x = worldDirection.x * CurrentSpeed;
+    // Applies the CurrentSpeed (which includes the sprint calculation) to Z
+    currentMovement.z = worldDirection.z * CurrentSpeed;
+
+    // Calculates jumping/falling
+    HandleJumping();
+    // Actually moves the character through the world
+    characterController.Move(currentMovement * Time.deltaTime);
+}
+
+// Rotates the player's body left and right
+private void ApplyHorizontalRotation(float rotationAmount)
+{
+    // Rotates the whole GameObject on the Y axis
+    transform.Rotate(0, rotationAmount, 0);
+}
+
+// Rotates only the camera up and down
+private void ApplyVerticalRotation(float rotationAmount)
+{
+    // Calculates rotation and "Clamps" it so you can't look past 80 degrees up or down
+    verticalRotation = Mathf.Clamp(verticalRotation - rotationAmount, -upDownLookRange, upDownLookRange);
+    // Applies that rotation to the Camera's local rotation
+    mainCamera.transform.localRotation = Quaternion.Euler(verticalRotation, 0, 0);
+}
+
+// Gathers mouse input and sends it to the rotation functions
+private void HandleRotation()
+{
+    // Gets mouse X movement multiplied by sensitivity
+    float mouseXRotation = playerInputHandler.RotationInput.x * mouseSensitivity;
+    // Gets mouse Y movement multiplied by sensitivity
+    float mouseYRotation = playerInputHandler.RotationInput.y * mouseSensitivity;
+
+    // Apply body rotation
+    ApplyHorizontalRotation(mouseXRotation);
+    // Apply camera rotation
+    ApplyVerticalRotation(mouseYRotation);
+}
+
+```
+
+}
